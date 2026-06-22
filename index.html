@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎨 我的绘画画廊</title>
+    <style>
+        /* ---------- 这是CSS样式：让页面变得好看 ---------- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f0f2f5;
+            padding: 30px;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #888;
+            margin-bottom: 30px;
+        }
+        /* 上传区域 */
+        .upload-box {
+            background: white;
+            padding: 30px 40px;
+            border-radius: 20px;
+            display: inline-block;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            margin-bottom: 30px;
+        }
+        .upload-box input[type="file"] {
+            padding: 10px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            width: 200px;
+            cursor: pointer;
+        }
+        .upload-box button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 30px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 15px;
+            transition: 0.3s;
+        }
+        .upload-box button:hover {
+            background: #45a049;
+            transform: scale(1.02);
+        }
+        #status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #555;
+        }
+        /* 画廊网格 */
+        .gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            padding: 12px;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            width: 220px;
+            transition: 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        .card img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            border-radius: 10px;
+            background-color: #eee;
+        }
+        .card p {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #999;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .empty-tip {
+            color: #aaa;
+            font-size: 18px;
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🖼️ 我的绘画作品展</h1>
+    <p class="subtitle">上传你的画作，自动存入后端服务器</p>
+
+    <!-- 上传操作区 -->
+    <div class="upload-box">
+        <input type="file" id="fileInput" accept="image/*">
+        <button onclick="uploadFile()">📤 上传到后端</button>
+        <p id="status">💡 选择图片后点击上传</p>
+    </div>
+
+    <!-- 图片展示墙 -->
+    <div class="gallery" id="gallery">
+        <div class="empty-tip">⏳ 正在加载画廊...</div>
+    </div>
+
+    <script>
+        // ---------- 这是JavaScript：负责和后端“聊天” ----------
+        
+        // 后端地址（因为你的后端跑在5000端口）
+        const API_BASE = 'http://127.0.0.1:5000';
+
+        // 【功能1】加载图片列表
+        function loadImages() {
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '<div class="empty-tip">⏳ 加载中...</div>';
+
+            fetch(API_BASE + '/api/images')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        const images = data.data;
+                        if (images.length === 0) {
+                            gallery.innerHTML = '<div class="empty-tip">🖼️ 画廊空空如也，快上传第一幅画吧！</div>';
+                            return;
+                        }
+                        // 拼接卡片
+                        gallery.innerHTML = images.map(img => `
+                            <div class="card">
+                                <img src="${API_BASE}/images/${img}" alt="画作" loading="lazy">
+                                <p>${img.substring(0, 15)}</p>
+                            </div>
+                        `).join('');
+                    } else {
+                        gallery.innerHTML = `<div class="empty-tip">❌ 加载失败：${data.message}</div>`;
+                    }
+                })
+                .catch(err => {
+                    gallery.innerHTML = `<div class="empty-tip">❌ 无法连接后端！请确认后端已启动（python app.py）</div>`;
+                    console.error('前端报错:', err);
+                });
+        }
+
+        // 【功能2】上传图片
+        function uploadFile() {
+            const input = document.getElementById('fileInput');
+            const status = document.getElementById('status');
+            
+            // 检查有没有选文件
+            if (input.files.length === 0) {
+                status.innerHTML = '⚠️ 请先点击“选择文件”选一张图片！';
+                return;
+            }
+
+            const file = input.files[0];
+            const formData = new FormData();
+            formData.append('file', file); // 字段名必须叫 'file'，和后端约定好的
+
+            status.innerHTML = '⏳ 正在上传，请稍候...';
+            
+            fetch(API_BASE + '/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.code === 200) {
+                    status.innerHTML = `✅ 上传成功！文件名：${data.filename}`;
+                    input.value = ''; // 清空选择框
+                    loadImages(); // 刷新画廊
+                } else {
+                    status.innerHTML = `❌ 上传失败：${data.message}`;
+                }
+            })
+            .catch(err => {
+                status.innerHTML = `❌ 请求失败，请确认后端是否在运行 (python app.py)`;
+                console.error('上传报错:', err);
+            });
+        }
+
+        // 页面一打开，自动加载图片
+        window.onload = loadImages;
+    </script>
+</body>
+</html>
